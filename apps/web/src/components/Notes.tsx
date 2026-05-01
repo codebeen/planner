@@ -64,7 +64,7 @@ export default function Notes({ notes, setNotes }: Props) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {notes.map(n => (
-          <div key={n.id} className={`${n.color} rounded-2xl p-4 border border-pink-100 group relative cursor-pointer`} onClick={() => openEdit(n)}>
+          <div key={n.id} className="bg-pink-100 rounded-2xl p-4 border border-pink-200 group relative cursor-pointer" onClick={() => openEdit(n)}>
             <button onClick={e => { e.stopPropagation(); remove(n.id); }}
               className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 text-pink-300 hover:text-pink-500"><X size={13} /></button>
             {n.title && <h3 className="font-semibold text-pink-800 text-sm mb-1 pr-4">{n.title}</h3>}
