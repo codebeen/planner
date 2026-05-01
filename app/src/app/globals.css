@@ -21,3 +21,54 @@ body {
 
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Tiptap Styles */
+.ProseMirror {
+  outline: none;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--pink-300);
+  pointer-events: none;
+  height: 0;
+}
+
+.ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.ProseMirror h1 { font-size: 1.5rem; font-weight: 700; margin-top: 1rem; margin-bottom: 0.5rem; }
+.ProseMirror h2 { font-size: 1.25rem; font-weight: 600; margin-top: 0.75rem; margin-bottom: 0.5rem; }
+.ProseMirror h3 { font-size: 1.1rem; font-weight: 600; margin-top: 0.5rem; margin-bottom: 0.25rem; }
+
+.ProseMirror blockquote {
+  border-left: 3px solid var(--pink-200);
+  padding-left: 1rem;
+  font-style: italic;
+  margin: 0.5rem 0;
+}
+
+.ProseMirror hr {
+  border: 0;
+  border-top: 1px solid var(--pink-100);
+  margin: 1rem 0;
+}
+
+/* Prose Preview (for cards) */
+.prose-preview h1, .prose-preview h2, .prose-preview h3 { font-size: inherit; font-weight: bold; margin: 0; display: inline; }
+.prose-preview p { display: inline; }
+.prose-preview ul, .prose-preview ol { display: inline; padding: 0; list-style: none; }
+.prose-preview li { display: inline; }
+.prose-preview li::after { content: ", "; }
+.prose-preview li:last-child::after { content: ""; }
+.prose-preview blockquote { border: none; padding: 0; font-style: italic; display: inline; }

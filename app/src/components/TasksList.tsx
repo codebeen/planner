@@ -1,8 +1,13 @@
 "use client";
-import { CalendarDays, Clock, Check, X, Inbox } from "lucide-react";
-import { type CalendarTaskMap, type CalendarTask } from "./Calendar";
+import { useState, useEffect, useCallback } from "react";
+import { CalendarDays, Clock, Check, X, Inbox, Loader2 } from "lucide-react";
+import { type CalendarTask } from "./Calendar";
+
+// Hardcoded user_id (replace with real auth later)
+const HARDCODED_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 function formatTime(t: string) {
+  if (!t) return "";
   const [h, m] = t.split(":").map(Number);
   return `${h % 12 || 12}:${m.toString().padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
@@ -27,31 +32,85 @@ function isPast(key: string) {
 }
 
 interface Props {
-  tasks: CalendarTaskMap;
-  setTasks: React.Dispatch<React.SetStateAction<CalendarTaskMap>>;
   onNavigate: (tab: string) => void;
 }
 
-export default function TasksList({ tasks, setTasks, onNavigate }: Props) {
-  const toggle = (dateKey: string, id: number) =>
-    setTasks(prev => ({ ...prev, [dateKey]: prev[dateKey].map(t => t.id === id ? { ...t, done: !t.done } : t) }));
+export default function TasksList({ onNavigate }: Props) {
+  const [tasks, setTasks] = useState<CalendarTask[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const remove = (dateKey: string, id: number) =>
-    setTasks(prev => ({ ...prev, [dateKey]: prev[dateKey].filter(t => t.id !== id) }));
+  const fetchTasks = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/tasks?user_id=${HARDCODED_USER_ID}`);
+      if (!res.ok) throw new Error("Failed to fetch tasks");
+      const data = await res.json();
+      setTasks(data);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
+
+  const toggle = async (task: CalendarTask) => {
+    try {
+      const res = await fetch(`/api/tasks/${task.task_id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...task, is_done: !task.is_done }),
+      });
+      if (!res.ok) throw new Error("Failed to update task");
+      const updated = await res.json();
+      setTasks(prev => prev.map(t => t.task_id === task.task_id ? updated : t));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const remove = async (task_id: string) => {
+    try {
+      const res = await fetch(`/api/tasks/${task_id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete task");
+      setTasks(prev => prev.filter(t => t.task_id !== task_id));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Group tasks by date
+  const groupedTasks = tasks.reduce((acc, task) => {
+    const key = task.task_date;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(task);
+    return acc;
+  }, {} as Record<string, CalendarTask[]>);
 
   // Sort date keys chronologically
-  const sortedKeys = Object.keys(tasks)
-    .filter(k => tasks[k].length > 0)
-    .sort((a, b) => {
-      const [ay, am, ad] = a.split("-").map(Number);
-      const [by, bm, bd] = b.split("-").map(Number);
-      return new Date(ay, am - 1, ad).getTime() - new Date(by, bm - 1, bd).getTime();
-    });
+  const sortedKeys = Object.keys(groupedTasks).sort((a, b) => {
+    const [ay, am, ad] = a.split("-").map(Number);
+    const [by, bm, bd] = b.split("-").map(Number);
+    return new Date(ay, am - 1, ad).getTime() - new Date(by, bm - 1, bd).getTime();
+  });
 
-  const totalTasks = sortedKeys.reduce((s, k) => s + tasks[k].length, 0);
-  const doneTasks = sortedKeys.reduce((s, k) => s + tasks[k].filter(t => t.done).length, 0);
+  const totalTasks = tasks.length;
+  const doneTasks = tasks.filter(t => t.is_done).length;
 
-  if (sortedKeys.length === 0) {
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-24 text-pink-300">
+        <Loader2 size={48} className="animate-spin" />
+      </div>
+    );
+  }
+
+  if (tasks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-pink-300">
         <Inbox size={48} className="mb-3 text-pink-200" />
@@ -69,6 +128,8 @@ export default function TasksList({ tasks, setTasks, onNavigate }: Props) {
 
   return (
     <div className="space-y-5">
+      {error && <p className="text-sm text-red-500 bg-red-50 p-3 rounded-xl border border-red-100">{error}</p>}
+      
       {/* Summary bar */}
       <div className="bg-white rounded-2xl border border-pink-100 shadow-sm p-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -84,10 +145,10 @@ export default function TasksList({ tasks, setTasks, onNavigate }: Props) {
       </div>
 
       {sortedKeys.map(dateKey => {
-        const dateTasks = tasks[dateKey];
+        const dateTasks = groupedTasks[dateKey];
         const today = isToday(dateKey);
         const past = isPast(dateKey);
-        const doneCnt = dateTasks.filter(t => t.done).length;
+        const doneCnt = dateTasks.filter(t => t.is_done).length;
 
         return (
           <div key={dateKey} className="bg-white rounded-2xl border border-pink-100 shadow-sm overflow-hidden">
@@ -108,23 +169,23 @@ export default function TasksList({ tasks, setTasks, onNavigate }: Props) {
             {/* Tasks */}
             <ul className="divide-y divide-pink-50">
               {dateTasks.map((t: CalendarTask) => (
-                <li key={t.id} className="flex items-center gap-3 px-4 py-3 group hover:bg-pink-50/50 transition-colors">
+                <li key={t.task_id} className="flex items-center gap-3 px-4 py-3 group hover:bg-pink-50/50 transition-colors">
                   <button
-                    onClick={() => toggle(dateKey, t.id)}
+                    onClick={() => toggle(t)}
                     className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors
-                      ${t.done ? "bg-pink-400 border-pink-400" : "border-pink-300 hover:border-pink-500"}`}
+                      ${t.is_done ? "bg-pink-400 border-pink-400" : "border-pink-300 hover:border-pink-500"}`}
                   >
-                    {t.done && <Check size={10} className="text-white" strokeWidth={3} />}
+                    {t.is_done && <Check size={10} className="text-white" strokeWidth={3} />}
                   </button>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium truncate ${t.done ? "line-through text-pink-300" : "text-pink-800"}`}>{t.text}</p>
+                    <p className={`text-sm font-medium truncate ${t.is_done ? "line-through text-pink-300" : "text-pink-800"}`}>{t.name}</p>
                     <p className="text-xs text-pink-400 flex items-center gap-1 mt-0.5">
-                      <Clock size={10} /> {formatTime(t.start)} – {formatTime(t.end)}
+                      <Clock size={10} /> {formatTime(t.start_time)} – {formatTime(t.end_time)}
                     </p>
                   </div>
                   <button
-                    onClick={() => remove(dateKey, t.id)}
-                    className="opacity-0 group-hover:opacity-100 text-pink-300 hover:text-pink-500 flex-shrink-0"
+                    onClick={() => remove(t.task_id)}
+                    className="opacity-0 group-hover:opacity-100 text-pink-300 hover:text-pink-500 flex-shrink-0 transition-opacity"
                   >
                     <X size={13} />
                   </button>

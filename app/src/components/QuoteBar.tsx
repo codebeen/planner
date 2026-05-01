@@ -16,8 +16,9 @@ const QUOTES = [
 ];
 
 export default function QuoteBar() {
-  const [idx, setIdx] = useState(() => Math.floor(Math.random() * QUOTES.length));
+  const [idx, setIdx] = useState(0);
   const [visible, setVisible] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   const next = useCallback((manual = false) => {
     setVisible(false);
@@ -28,9 +29,15 @@ export default function QuoteBar() {
   }, []);
 
   useEffect(() => {
+    setMounted(true);
+    setIdx(Math.floor(Math.random() * QUOTES.length));
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
     const timer = setInterval(() => next(), 30000);
     return () => clearInterval(timer);
-  }, [next]);
+  }, [next, mounted]);
 
   return (
     <div className="relative w-full overflow-hidden border-b border-pink-300 px-4 py-2.5 flex items-center justify-between gap-3">
@@ -58,7 +65,7 @@ export default function QuoteBar() {
         className="relative text-pink-900 text-sm italic flex-1 text-center font-medium drop-shadow-sm transition-opacity duration-400"
         style={{ opacity: visible ? 1 : 0, transition: "opacity 0.4s ease" }}
       >
-        {QUOTES[idx]}
+        {mounted ? QUOTES[idx] : ""}
       </p>
 
       <button

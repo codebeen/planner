@@ -1,77 +1,260 @@
 "use client";
-import { useState } from "react";
-import { NotebookPen, Plus, X } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { NotebookPen, Plus, X, Loader2 } from "lucide-react";
+import NoteEditor from "./NoteEditor";
 
-export type Note = { id: number; title: string; body: string; color: string };
-const COLORS = ["bg-pink-50", "bg-rose-50", "bg-fuchsia-50", "bg-purple-50", "bg-pink-100"];
+// Hardcoded user_id (replace with real auth later)
+const HARDCODED_USER_ID = "00000000-0000-0000-0000-000000000001";
 
-interface Props {
-  notes: Note[];
-  setNotes: React.Dispatch<React.SetStateAction<Note[]>>;
-}
+export type Note = {
+  note_id: string;
+  title: string;
+  content: string;
+  user_id: string;
+  color?: string;
+};
 
-export default function Notes({ notes, setNotes }: Props) {
-  const [editing, setEditing] = useState<Note | null>(null);
+const COLORS = [
+  "bg-pink-50",
+  "bg-rose-50",
+  "bg-fuchsia-50",
+  "bg-purple-50",
+  "bg-pink-100",
+];
+
+export default function Notes() {
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
+  const [content, setContent] = useState("");
+  const [modalColor, setModalColor] = useState(COLORS[0]);
 
-  const openNew = () => {
-    setEditing({ id: 0, title: "", body: "", color: COLORS[Math.floor(Math.random() * COLORS.length)] });
-    setTitle(""); setBody("");
-  };
-
-  const save = () => {
-    if (!title.trim() && !body.trim()) { setEditing(null); return; }
-    if (editing!.id === 0) {
-      setNotes(prev => [...prev, { ...editing!, id: Date.now(), title, body }]);
-    } else {
-      setNotes(prev => prev.map(n => n.id === editing!.id ? { ...n, title, body } : n));
+  // ── Fetch all notes ──────────────────────────────────────────────────────
+  const fetchNotes = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/notes?user_id=${HARDCODED_USER_ID}`);
+      if (!res.ok) throw new Error("Failed to fetch notes");
+      const data: Note[] = await res.json();
+      // Attach a random color for display purposes
+      setNotes(
+        data.map((n) => ({
+          ...n,
+          color: COLORS[Math.floor(Math.random() * COLORS.length)],
+        }))
+      );
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setLoading(false);
     }
-    setEditing(null);
+  }, []);
+
+  useEffect(() => {
+    fetchNotes();
+  }, [fetchNotes]);
+
+  // ── Open new note modal ──────────────────────────────────────────────────
+  const openNew = () => {
+    setEditingNote(null);
+    setTitle("");
+    setContent("");
+    setModalColor(COLORS[Math.floor(Math.random() * COLORS.length)]);
+    setIsModalOpen(true);
   };
 
-  const remove = (id: number) => setNotes(prev => prev.filter(n => n.id !== id));
-  const openEdit = (n: Note) => { setEditing(n); setTitle(n.title); setBody(n.body); };
+  // ── Open edit modal ──────────────────────────────────────────────────────
+  const openEdit = (n: Note) => {
+    setEditingNote(n);
+    setTitle(n.title ?? "");
+    setContent(n.content ?? "");
+    setModalColor(n.color ?? COLORS[0]);
+    setIsModalOpen(true);
+  };
 
+  // ── Save (create or update) ──────────────────────────────────────────────
+  const save = async () => {
+    if (!title.trim() && !content.trim()) {
+      setIsModalOpen(false);
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      if (!editingNote) {
+        // CREATE
+        const res = await fetch("/api/notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: title.trim(),
+            content: content.trim(),
+            user_id: HARDCODED_USER_ID,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error ?? "Failed to create note");
+        }
+        const created: Note = await res.json();
+        setNotes((prev) => [{ ...created, color: modalColor }, ...prev]);
+      } else {
+        // UPDATE
+        const res = await fetch(`/api/notes/${editingNote.note_id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: title.trim(),
+            content: content.trim(),
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error ?? "Failed to update note");
+        }
+        const updated: Note = await res.json();
+        setNotes((prev) =>
+          prev.map((n) =>
+            n.note_id === editingNote.note_id
+              ? { ...updated, color: n.color }
+              : n
+          )
+        );
+      }
+      setIsModalOpen(false);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Delete ───────────────────────────────────────────────────────────────
+  const remove = async (noteId: string) => {
+    setError(null);
+    try {
+      const res = await fetch(`/api/notes/${noteId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? "Failed to delete note");
+      }
+      setNotes((prev) => prev.filter((n) => n.note_id !== noteId));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    }
+  };
+
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-pink-700 font-semibold text-lg flex items-center gap-2"><NotebookPen size={18} /> Notes</h2>
-        <button onClick={openNew} className="bg-pink-500 hover:bg-pink-600 text-white text-sm px-4 py-2 rounded-xl font-medium flex items-center gap-1.5"><Plus size={14} /> New Note</button>
+        <h2 className="text-pink-700 font-semibold text-lg flex items-center gap-2">
+          <NotebookPen size={18} /> Notes
+        </h2>
+        <button
+          onClick={openNew}
+          className="bg-pink-500 hover:bg-pink-600 text-white text-sm px-4 py-2 rounded-xl font-medium flex items-center gap-1.5 transition-colors"
+        >
+          <Plus size={14} /> New Note
+        </button>
       </div>
 
-      {editing && (
+      {error && (
+        <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
+          {error}
+        </div>
+      )}
+
+      {/* ── Modal ─────────────────────────────────────────────────────────── */}
+      {isModalOpen && (
         <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5 border border-pink-100">
-            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Note title..."
-              className="w-full text-lg font-semibold text-pink-800 border-b border-pink-100 pb-2 mb-3 outline-none placeholder-pink-300" />
-            <textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Write your note here..." rows={6}
-              className="w-full text-sm text-pink-700 outline-none resize-none placeholder-pink-300" />
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-5 border border-pink-100">
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Note title..."
+              className="w-full text-lg font-semibold text-pink-800 border-b border-pink-100 pb-2 mb-3 outline-none placeholder-pink-300"
+            />
+            <NoteEditor
+              content={content}
+              onChange={setContent}
+              placeholder="Write your note here..."
+            />
             <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-pink-400 hover:text-pink-600">Cancel</button>
-              <button onClick={save} className="px-4 py-2 text-sm bg-pink-500 hover:bg-pink-600 text-white rounded-xl font-medium">Save</button>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                disabled={saving}
+                className="px-4 py-2 text-sm text-pink-400 hover:text-pink-600 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={save}
+                disabled={saving}
+                className="px-4 py-2 text-sm bg-pink-500 hover:bg-pink-600 text-white rounded-xl font-medium flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+              >
+                {saving && <Loader2 size={13} className="animate-spin" />}
+                {saving ? "Saving…" : "Save"}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {notes.length === 0 && (
+      {/* ── Loading ───────────────────────────────────────────────────────── */}
+      {loading && (
+        <div className="flex justify-center items-center py-16 text-pink-300">
+          <Loader2 size={28} className="animate-spin" />
+        </div>
+      )}
+
+      {/* ── Empty state ───────────────────────────────────────────────────── */}
+      {!loading && notes.length === 0 && (
         <div className="text-center text-pink-300 py-16">
           <NotebookPen size={40} className="mx-auto mb-2 text-pink-200" />
           <p className="text-sm">No notes yet. Create one!</p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {notes.map(n => (
-          <div key={n.id} className="bg-pink-100 rounded-2xl p-4 border border-pink-200 group relative cursor-pointer" onClick={() => openEdit(n)}>
-            <button onClick={e => { e.stopPropagation(); remove(n.id); }}
-              className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 text-pink-300 hover:text-pink-500"><X size={13} /></button>
-            {n.title && <h3 className="font-semibold text-pink-800 text-sm mb-1 pr-4">{n.title}</h3>}
-            <p className="text-pink-600 text-xs line-clamp-4 whitespace-pre-wrap">{n.body}</p>
-          </div>
-        ))}
-      </div>
+      {/* ── Note cards ────────────────────────────────────────────────────── */}
+      {!loading && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {notes.map((n) => (
+            <div
+              key={n.note_id}
+              className="bg-white rounded-2xl p-4 border border-pink-200 group relative cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => openEdit(n)}
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  remove(n.note_id);
+                }}
+                className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 text-pink-300 hover:text-pink-500 transition-opacity"
+              >
+                <X size={13} />
+              </button>
+              {n.title && (
+                <h3 className="font-semibold text-pink-800 text-sm mb-1 pr-4">
+                  {n.title}
+                </h3>
+              )}
+              <div 
+                className="text-pink-600 text-xs line-clamp-4 whitespace-pre-wrap prose-preview"
+                dangerouslySetInnerHTML={{ __html: n.content }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

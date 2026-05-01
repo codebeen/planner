@@ -1,39 +1,71 @@
 "use client";
+import { useState, useEffect } from "react";
 import { CalendarDays, CheckSquare, NotebookPen, UtensilsCrossed, Clock, Check, Flame, TrendingUp } from "lucide-react";
 
-type CalendarTask = { id: number; text: string; start: string; end: string; done: boolean };
+type CalendarTask = { task_id: string; name: string; task_date: string; start_time: string; end_time: string; is_done: boolean };
 type CategoryMap = Record<string, { id: number; label: string; done: boolean }[]>;
-type Note = { id: number; title: string; body: string; color: string };
-type Meal = { id: number; time: string; food: string; calories: string };
+type Note = { note_id: string; title: string; content: string; color?: string };
+type FoodLogEntry = { food_log_id: string; food: string; category: MealType; calories: number; date_time: string };
 type MealType = "Breakfast" | "Lunch" | "Dinner" | "Snack";
 
+const HARDCODED_USER_ID = "00000000-0000-0000-0000-000000000001";
+
 interface DashboardProps {
-  calendarTasks: Record<string, CalendarTask[]>;
-  categoryTasks: CategoryMap;
-  notes: Note[];
-  foodLog: Record<string, Record<MealType, Meal[]>>;
   onNavigate: (tab: string) => void;
 }
 
 function formatTime(t: string) {
+  if (!t) return "";
   const [h, m] = t.split(":").map(Number);
   return `${h % 12 || 12}:${m.toString().padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
-export default function Dashboard({ calendarTasks, categoryTasks, notes, foodLog, onNavigate }: DashboardProps) {
+export default function Dashboard({ onNavigate }: DashboardProps) {
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [foodEntries, setFoodEntries] = useState<FoodLogEntry[]>([]);
+  const [todayTasks, setTodayTasks] = useState<CalendarTask[]>([]);
+
+  useEffect(() => {
+    // Fetch Notes
+    fetch(`/api/notes?user_id=${HARDCODED_USER_ID}`)
+      .then((r) => r.json())
+      .then((data: Note[]) => setNotes(Array.isArray(data) ? data : []))
+      .catch(() => setNotes([]));
+
+    // Fetch Today's Food
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+    const localDate = new Date(todayStr + "T00:00:00");
+    const start = new Date(localDate.getTime());
+    const end = new Date(localDate.getTime());
+    end.setHours(23, 59, 59, 999);
+
+    fetch(`/api/food-logs?user_id=${HARDCODED_USER_ID}&start=${start.toISOString()}&end=${end.toISOString()}`)
+      .then((r) => r.json())
+      .then((data: FoodLogEntry[]) => setFoodEntries(Array.isArray(data) ? data : []))
+      .catch(() => setFoodEntries([]));
+
+    // Fetch Today's Tasks
+    fetch(`/api/tasks?user_id=${HARDCODED_USER_ID}&date=${todayStr}`)
+      .then((r) => r.json())
+      .then((data: CalendarTask[]) => setTodayTasks(Array.isArray(data) ? data : []))
+      .catch(() => setTodayTasks([]));
+  }, []);
+
   const todayDate = new Date();
-  const todayKey = `${todayDate.getFullYear()}-${todayDate.getMonth() + 1}-${todayDate.getDate()}`;
-  const todayEvents = (calendarTasks[todayKey] ?? []).sort((a, b) => a.start.localeCompare(b.start));
+  const todayEvents = [...todayTasks].sort((a, b) => a.start_time.localeCompare(b.start_time));
 
-  const allTasks = Object.values(categoryTasks).flat();
-  const doneTasks = allTasks.filter(t => t.done).length;
-  const totalTasks = allTasks.length;
+  const totalCals = foodEntries.reduce((s, m) => s + (m.calories || 0), 0);
+  const mealsLogged = foodEntries.length;
 
-  const todayFood = foodLog[new Date().toISOString().split("T")[0]] ?? {};
-  const totalCals = Object.values(todayFood).flat().reduce((s, m) => s + (parseInt(m.calories) || 0), 0);
-  const mealsLogged = Object.values(todayFood).flat().length;
+  // Group food by category for the UI
+  const groupedFood = foodEntries.reduce((acc, entry) => {
+    if (!acc[entry.category]) acc[entry.category] = [];
+    acc[entry.category].push(entry);
+    return acc;
+  }, {} as Record<MealType, FoodLogEntry[]>);
 
-  const upcomingEvent = todayEvents.find(e => !e.done);
+  const upcomingEvent = todayEvents.find(e => !e.is_done);
 
   const PRESETS = ["Morning Routine", "Self Care", "Study / Work", "Household"];
 
@@ -47,7 +79,7 @@ export default function Dashboard({ calendarTasks, categoryTasks, notes, foodLog
         <h2 className="text-2xl font-bold mt-0.5">Good {todayDate.getHours() < 12 ? "morning" : todayDate.getHours() < 17 ? "afternoon" : "evening"}, Shanel ✨</h2>
         {upcomingEvent && (
           <p className="text-sm mt-2 opacity-90 flex items-center gap-1.5">
-            <Clock size={13} /> Next: <span className="font-medium">{upcomingEvent.text}</span> at {formatTime(upcomingEvent.start)}
+            <Clock size={13} /> Next: <span className="font-medium">{upcomingEvent.name}</span> at {formatTime(upcomingEvent.start_time)}
           </p>
         )}
       </div>
@@ -66,9 +98,9 @@ export default function Dashboard({ calendarTasks, categoryTasks, notes, foodLog
         <button onClick={() => onNavigate("tasks")} className="bg-white rounded-2xl border border-pink-100 p-4 text-left hover:border-pink-300 transition-colors">
           <div className="flex items-center justify-between mb-2">
             <CheckSquare size={18} className="text-pink-400" />
-            <span className="text-xs text-pink-300">{totalTasks > 0 ? `${Math.round((doneTasks / totalTasks) * 100)}%` : "0%"}</span>
+            <span className="text-xs text-pink-300">{todayEvents.length > 0 ? `${Math.round((todayEvents.filter(e => e.is_done).length / todayEvents.length) * 100)}%` : "0%"}</span>
           </div>
-          <p className="text-2xl font-bold text-pink-700">{doneTasks}<span className="text-sm font-normal text-pink-300">/{totalTasks}</span></p>
+          <p className="text-2xl font-bold text-pink-700">{todayEvents.filter(e => e.is_done).length}<span className="text-sm font-normal text-pink-300">/{todayEvents.length}</span></p>
           <p className="text-xs text-pink-400 mt-0.5">tasks done</p>
         </button>
 
@@ -106,13 +138,13 @@ export default function Dashboard({ calendarTasks, categoryTasks, notes, foodLog
           ) : (
             <ul className="space-y-2">
               {todayEvents.slice(0, 4).map(e => (
-                <li key={e.id} className={`flex items-center gap-3 p-2 rounded-xl ${e.done ? "opacity-50" : "bg-pink-50"}`}>
-                  <div className={`w-1.5 h-8 rounded-full flex-shrink-0 ${e.done ? "bg-pink-200" : "bg-pink-400"}`} />
+                <li key={e.task_id} className={`flex items-center gap-3 p-2 rounded-xl ${e.is_done ? "opacity-50" : "bg-pink-50"}`}>
+                  <div className={`w-1.5 h-8 rounded-full flex-shrink-0 ${e.is_done ? "bg-pink-200" : "bg-pink-400"}`} />
                   <div className="min-w-0">
-                    <p className={`text-sm font-medium truncate ${e.done ? "line-through text-pink-300" : "text-pink-800"}`}>{e.text}</p>
-                    <p className="text-xs text-pink-400">{formatTime(e.start)} – {formatTime(e.end)}</p>
+                    <p className={`text-sm font-medium truncate ${e.is_done ? "line-through text-pink-300" : "text-pink-800"}`}>{e.name}</p>
+                    <p className="text-xs text-pink-400">{formatTime(e.start_time)} – {formatTime(e.end_time)}</p>
                   </div>
-                  {e.done && <Check size={14} className="text-pink-300 flex-shrink-0 ml-auto" />}
+                  {e.is_done && <Check size={14} className="text-pink-300 flex-shrink-0 ml-auto" />}
                 </li>
               ))}
               {todayEvents.length > 4 && <p className="text-xs text-pink-300 text-center">+{todayEvents.length - 4} more</p>}
@@ -120,31 +152,6 @@ export default function Dashboard({ calendarTasks, categoryTasks, notes, foodLog
           )}
         </div>
 
-        {/* Task progress per category */}
-        <div className="bg-white rounded-2xl border border-pink-100 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-pink-700 text-sm flex items-center gap-1.5"><TrendingUp size={15} /> Task Progress</h3>
-            <button onClick={() => onNavigate("tasks")} className="text-xs text-pink-400 hover:text-pink-600">View all</button>
-          </div>
-          <div className="space-y-3">
-            {PRESETS.map(cat => {
-              const tasks = categoryTasks[cat] ?? [];
-              const done = tasks.filter(t => t.done).length;
-              const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
-              return (
-                <div key={cat}>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-pink-700 font-medium">{cat}</span>
-                    <span className="text-pink-400">{done}/{tasks.length}</span>
-                  </div>
-                  <div className="h-2 bg-pink-100 rounded-full">
-                    <div className="h-2 bg-pink-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
 
         {/* Recent notes */}
         <div className="bg-white rounded-2xl border border-pink-100 p-4">
@@ -160,9 +167,12 @@ export default function Dashboard({ calendarTasks, categoryTasks, notes, foodLog
           ) : (
             <div className="space-y-2">
               {notes.slice(-3).reverse().map(n => (
-                <div key={n.id} className={`${n.color} rounded-xl p-3 border border-pink-100`}>
+                <div key={n.note_id} className={`${n.color ?? "bg-pink-50"} rounded-xl p-3 border border-pink-100`}>
                   {n.title && <p className="text-xs font-semibold text-pink-800 truncate">{n.title}</p>}
-                  <p className="text-xs text-pink-500 line-clamp-2 mt-0.5">{n.body}</p>
+                  <div 
+                    className="text-xs text-pink-500 line-clamp-2 mt-0.5 prose-preview"
+                    dangerouslySetInnerHTML={{ __html: n.content }}
+                  />
                 </div>
               ))}
             </div>
@@ -184,14 +194,14 @@ export default function Dashboard({ calendarTasks, categoryTasks, notes, foodLog
           (
             <div className="space-y-1.5">
               {(["Breakfast", "Lunch", "Dinner", "Snack"] as MealType[]).map(type => {
-                const items = todayFood[type] ?? [];
+                const items = groupedFood[type] ?? [];
                 if (!items.length) return null;
                 return (
                   <div key={type} className="flex items-center justify-between text-xs">
                     <span className="text-pink-500 font-medium w-20">{type}</span>
                     <span className="text-pink-700 flex-1 truncate">{items.map(i => i.food).join(", ")}</span>
                     {items.some(i => i.calories) && (
-                      <span className="text-pink-400 ml-2 flex-shrink-0">{items.reduce((s, i) => s + (parseInt(i.calories) || 0), 0)} kcal</span>
+                      <span className="text-pink-400 ml-2 flex-shrink-0">{items.reduce((s, i) => s + (parseFloat(i.calories) || 0), 0)} kcal</span>
                     )}
                   </div>
                 );

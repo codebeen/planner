@@ -6,7 +6,7 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "My Planner 🌸",
+  title: "Planner 🌸",
   description: "A personal planner with calendar, notes, food log & more",
 };
 

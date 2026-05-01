@@ -1,10 +1,20 @@
 "use client";
-import { useState } from "react";
-import { Sunrise, Sun, Moon, Apple, UtensilsCrossed, Flame, X, Plus } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Sunrise, Sun, Moon, Apple, UtensilsCrossed, Flame, X, Plus, Loader2 } from "lucide-react";
 
-export type Meal = { id: number; time: string; food: string; calories: string };
+// Hardcoded user_id (replace with real auth later)
+const HARDCODED_USER_ID = "00000000-0000-0000-0000-000000000001";
+
+export type FoodLogEntry = { 
+  food_log_id: string; 
+  date_time: string; 
+  food: string; 
+  calories: number; 
+  category: MealType;
+  user_id: string;
+};
+
 export type MealType = "Breakfast" | "Lunch" | "Dinner" | "Snack";
-export type FoodLogData = Record<string, Record<MealType, Meal[]>>;
 
 const MEAL_TYPES: { label: MealType; icon: React.ReactNode }[] = [
   { label: "Breakfast", icon: <Sunrise size={14} /> },
@@ -12,34 +22,111 @@ const MEAL_TYPES: { label: MealType; icon: React.ReactNode }[] = [
   { label: "Dinner",    icon: <Moon size={14} /> },
   { label: "Snack",     icon: <Apple size={14} /> },
 ];
+const formatDateTime = (dateStr: string) => {
+  const date = new Date(dateStr);
+  const datePart = date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "2-digit",
+    year: "numeric",
+  });
+  const timePart = date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).toLowerCase();
+  return `${datePart} - ${timePart}`;
+};
 
-interface Props {
-  log: FoodLogData;
-  setLog: React.Dispatch<React.SetStateAction<FoodLogData>>;
-}
-
-export default function FoodLog({ log, setLog }: Props) {
-  const today = new Date().toISOString().split("T")[0];
-  const [date, setDate] = useState(today);
+export default function FoodLog() {
+  const getTodayStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+  };
+  const [date, setDate] = useState(getTodayStr());
   const [active, setActive] = useState<MealType>("Breakfast");
   const [food, setFood] = useState("");
   const [calories, setCalories] = useState("");
+  
+  const [entries, setEntries] = useState<FoodLogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const meals = log[date]?.[active] ?? [];
+  // ── Fetch logs ───────────────────────────────────────────────────────────
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Calculate local day boundaries in UTC
+      const localDate = new Date(date + "T00:00:00");
+      const start = new Date(localDate.getTime());
+      const end = new Date(localDate.getTime());
+      end.setHours(23, 59, 59, 999);
 
-  const add = () => {
+      const res = await fetch(`/api/food-logs?user_id=${HARDCODED_USER_ID}&start=${start.toISOString()}&end=${end.toISOString()}`);
+      if (!res.ok) throw new Error("Failed to fetch food logs");
+      const data = await res.json();
+      setEntries(data);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  }, [date]);
+
+  useEffect(() => {
+    fetchLogs();
+  }, [fetchLogs]);
+
+  // ── Add entry ────────────────────────────────────────────────────────────
+  const add = async () => {
     if (!food.trim()) return;
-    const entry: Meal = { id: Date.now(), time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), food: food.trim(), calories };
-    setLog(prev => ({ ...prev, [date]: { ...prev[date], [active]: [...(prev[date]?.[active] ?? []), entry] } }));
-    setFood(""); setCalories("");
+    setAdding(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/food-logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          food: food.trim(),
+          category: active,
+          calories: parseFloat(calories) || 0,
+          date_time: `${date}T${new Date().toISOString().split("T")[1]}`,
+          user_id: HARDCODED_USER_ID,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? "Failed to add food log");
+      }
+      const created = await res.json();
+      setEntries(prev => [...prev, created]);
+      setFood(""); 
+      setCalories("");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setAdding(false);
+    }
   };
 
-  const remove = (id: number) =>
-    setLog(prev => ({ ...prev, [date]: { ...prev[date], [active]: prev[date][active].filter(m => m.id !== id) } }));
+  // ── Remove entry ─────────────────────────────────────────────────────────
+  const remove = async (id: string) => {
+    setError(null);
+    try {
+      const res = await fetch(`/api/food-logs/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? "Failed to delete food log");
+      }
+      setEntries(prev => prev.filter(m => m.food_log_id !== id));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Unknown error");
+    }
+  };
 
-  const totalCals = Object.values(log[date] ?? {}).flat()
-    .flatMap(m => (Array.isArray(m) ? m : []))
-    .reduce((sum, m) => sum + (parseInt(m.calories) || 0), 0);
+  const filteredMeals = entries.filter(e => e.category === active);
+  const totalCals = entries.reduce((sum, m) => sum + (m.calories || 0), 0);
 
   return (
     <div>
@@ -48,11 +135,17 @@ export default function FoodLog({ log, setLog }: Props) {
         <div className="flex items-center gap-2">
           <input type="date" value={date} onChange={e => setDate(e.target.value)}
             className="text-sm border border-pink-200 rounded-xl px-3 py-1.5 outline-none focus:border-pink-400 bg-pink-50 text-pink-700" />
-          {totalCals > 0 && (
+          {!loading && totalCals > 0 && (
             <span className="text-xs bg-pink-100 text-pink-600 px-3 py-1.5 rounded-xl font-medium flex items-center gap-1"><Flame size={12} /> {totalCals} kcal</span>
           )}
         </div>
       </div>
+
+      {error && (
+        <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
+          {error}
+        </div>
+      )}
 
       <div className="flex gap-2 mb-4 flex-wrap">
         {MEAL_TYPES.map(m => (
@@ -60,8 +153,10 @@ export default function FoodLog({ log, setLog }: Props) {
             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors
               ${active === m.label ? "bg-pink-500 text-white shadow-sm" : "bg-white border border-pink-200 text-pink-600 hover:bg-pink-50"}`}>
             {m.icon} {m.label}
-            {(log[date]?.[m.label]?.length ?? 0) > 0 && (
-              <span className={`ml-0.5 text-xs ${active === m.label ? "text-pink-200" : "text-pink-400"}`}>({log[date][m.label].length})</span>
+            {entries.filter(e => e.category === m.label).length > 0 && (
+              <span className={`ml-0.5 text-xs ${active === m.label ? "text-pink-200" : "text-pink-400"}`}>
+                ({entries.filter(e => e.category === m.label).length})
+              </span>
             )}
           </button>
         ))}
@@ -71,30 +166,48 @@ export default function FoodLog({ log, setLog }: Props) {
         <div className="flex gap-2 flex-wrap">
           <input value={food} onChange={e => setFood(e.target.value)} onKeyDown={e => e.key === "Enter" && add()}
             placeholder={`What did you eat for ${active.toLowerCase()}?`}
-            className="flex-1 min-w-40 text-sm border border-pink-200 rounded-xl px-3 py-2 outline-none focus:border-pink-400 bg-pink-50 placeholder-pink-300" />
+            disabled={adding}
+            className="flex-1 min-w-40 text-sm border border-pink-200 rounded-xl px-3 py-2 outline-none focus:border-pink-400 bg-pink-50 placeholder-pink-300 disabled:opacity-50" />
           <input value={calories} onChange={e => setCalories(e.target.value)} placeholder="kcal (optional)"
-            className="w-32 text-sm border border-pink-200 rounded-xl px-3 py-2 outline-none focus:border-pink-400 bg-pink-50 placeholder-pink-300" />
-          <button onClick={add} className="bg-pink-500 hover:bg-pink-600 text-white rounded-xl px-4 text-sm font-medium flex items-center gap-1.5"><Plus size={14} /> Add</button>
+            type="number"
+            step="any"
+            disabled={adding}
+            className="w-32 text-sm border border-pink-200 rounded-xl px-3 py-2 outline-none focus:border-pink-400 bg-pink-50 placeholder-pink-300 disabled:opacity-50" />
+          <button onClick={add} disabled={adding || !food.trim()} className="bg-pink-500 hover:bg-pink-600 text-white rounded-xl px-4 text-sm font-medium flex items-center gap-1.5 disabled:opacity-50 transition-colors">
+            {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            {adding ? "Adding..." : "Add"}
+          </button>
         </div>
       </div>
 
-      <div className="space-y-2">
-        {meals.length === 0 && (
-          <div className="text-center text-pink-300 py-8">
-            <UtensilsCrossed size={36} className="mx-auto mb-1 text-pink-200" />
-            <p className="text-sm">Nothing logged for {active.toLowerCase()} yet</p>
-          </div>
-        )}
-        {meals.map(m => (
-          <div key={m.id} className="bg-white rounded-xl border border-pink-100 px-4 py-3 flex items-center justify-between group">
-            <div>
-              <p className="text-sm font-medium text-pink-800">{m.food}</p>
-              <p className="text-xs text-pink-400">{m.time}{m.calories ? ` · ${m.calories} kcal` : ""}</p>
+      {loading ? (
+        <div className="flex justify-center items-center py-16 text-pink-300">
+          <Loader2 size={28} className="animate-spin" />
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filteredMeals.length === 0 && (
+            <div className="text-center text-pink-300 py-8">
+              <UtensilsCrossed size={36} className="mx-auto mb-1 text-pink-200" />
+              <p className="text-sm">Nothing logged for {active.toLowerCase()} yet</p>
             </div>
-            <button onClick={() => remove(m.id)} className="opacity-0 group-hover:opacity-100 text-pink-300 hover:text-pink-500"><X size={14} /></button>
-          </div>
-        ))}
-      </div>
+          )}
+          {filteredMeals.map(m => (
+            <div key={m.food_log_id} className="bg-white rounded-xl border border-pink-100 px-4 py-3 flex items-center justify-between group">
+              <div>
+                <p className="text-sm font-medium text-pink-800">{m.food}</p>
+                <p className="text-xs text-pink-400">
+                  {formatDateTime(m.date_time)}
+                  {m.calories ? ` · ${m.calories} kcal` : ""}
+                </p>
+              </div>
+              <button onClick={() => remove(m.food_log_id)} className="opacity-0 group-hover:opacity-100 text-pink-300 hover:text-pink-500 transition-opacity">
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
