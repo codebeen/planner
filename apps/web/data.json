@@ -1,0 +1,120 @@
+{
+  "calendarTasks": {},
+  "categoryTasks": {
+    "Morning Routine": [
+      {
+        "id": 0,
+        "label": "Wake up early",
+        "done": false
+      },
+      {
+        "id": 1,
+        "label": "Drink water",
+        "done": false
+      },
+      {
+        "id": 2,
+        "label": "Skincare routine",
+        "done": false
+      },
+      {
+        "id": 3,
+        "label": "Exercise / stretch",
+        "done": false
+      },
+      {
+        "id": 4,
+        "label": "Eat breakfast",
+        "done": false
+      },
+      {
+        "id": 5,
+        "label": "Plan the day",
+        "done": false
+      }
+    ],
+    "Self Care": [
+      {
+        "id": 0,
+        "label": "Meditate 10 mins",
+        "done": false
+      },
+      {
+        "id": 1,
+        "label": "Journal",
+        "done": false
+      },
+      {
+        "id": 2,
+        "label": "Read a book",
+        "done": false
+      },
+      {
+        "id": 3,
+        "label": "Take a walk",
+        "done": false
+      },
+      {
+        "id": 4,
+        "label": "No screen time 1hr before bed",
+        "done": false
+      }
+    ],
+    "Study / Work": [
+      {
+        "id": 0,
+        "label": "Review notes",
+        "done": false
+      },
+      {
+        "id": 1,
+        "label": "Complete assignments",
+        "done": false
+      },
+      {
+        "id": 2,
+        "label": "Check emails",
+        "done": false
+      },
+      {
+        "id": 3,
+        "label": "Attend meetings",
+        "done": false
+      },
+      {
+        "id": 4,
+        "label": "Take breaks",
+        "done": false
+      }
+    ],
+    "Household": [
+      {
+        "id": 0,
+        "label": "Make the bed",
+        "done": false
+      },
+      {
+        "id": 1,
+        "label": "Do laundry",
+        "done": false
+      },
+      {
+        "id": 2,
+        "label": "Clean desk",
+        "done": false
+      },
+      {
+        "id": 3,
+        "label": "Wash dishes",
+        "done": false
+      },
+      {
+        "id": 4,
+        "label": "Grocery shopping",
+        "done": false
+      }
+    ]
+  },
+  "notes": [],
+  "foodLog": {}
+}
