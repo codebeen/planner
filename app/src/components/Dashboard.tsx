@@ -201,7 +201,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                     <span className="text-pink-500 font-medium w-20">{type}</span>
                     <span className="text-pink-700 flex-1 truncate">{items.map(i => i.food).join(", ")}</span>
                     {items.some(i => i.calories) && (
-                      <span className="text-pink-400 ml-2 flex-shrink-0">{items.reduce((s, i) => s + (parseFloat(i.calories) || 0), 0)} kcal</span>
+                      <span className="text-pink-400 ml-2 flex-shrink-0">{items.reduce((s, i) => s + (i.calories || 0), 0)} kcal</span>
                     )}
                   </div>
                 );
