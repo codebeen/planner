@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import AuthLayout from "@/src/components/layouts/AuthLayout";
+import { login } from "../actions";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,10 +19,17 @@ export default function LoginPage() {
     setError("");
     if (!email || !password) { setError("Please fill in all fields."); return; }
     setLoading(true);
-    // Simulate auth — replace with real auth logic
-    await new Promise(r => setTimeout(r, 800));
-    setLoading(false);
-    router.push("/");
+    
+    const formData = new FormData();
+    formData.append("email", email);
+    formData.append("password", password);
+
+    const result = await login(formData);
+    
+    if (result?.error) {
+      setError(result.error);
+      setLoading(false);
+    }
   };
 
   return (

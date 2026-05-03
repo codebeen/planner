@@ -15,6 +15,7 @@ import {
     UtensilsCrossed,
 } from "lucide-react";
 import QuoteBar from "./QuoteBar";
+import { logout } from "../app/(auth)/actions";
 
 export const TABS = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -81,7 +82,9 @@ export default function Navbar({ tab, setTab }: NavbarProps) {
                                     <Settings size={14} /> Settings
                                 </button>
                                 <button
-                                    onClick={() => router.push("/login")}
+                                    onClick={async () => {
+                                        await logout();
+                                    }}
                                     className="w-full flex items-center gap-2 px-4 py-2 text-sm text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
                                 >
                                     <LogOut size={14} /> Sign out
