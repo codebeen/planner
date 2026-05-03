@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Flower2, Mail, Lock, Eye, EyeOff, User } from "lucide-react";
 import Link from "next/link";
 import AuthLayout from "@/src/components/layouts/AuthLayout";
+import { signup } from "../actions";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -23,10 +24,18 @@ export default function RegisterPage() {
     if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
     if (password !== confirm) { setError("Passwords do not match."); return; }
     setLoading(true);
-    // Simulate auth — replace with real auth logic
-    await new Promise(r => setTimeout(r, 800));
-    setLoading(false);
-    router.push("/");
+
+    const formData = new FormData();
+    formData.append("email", email);
+    formData.append("password", password);
+    formData.append("name", name);
+
+    const result = await signup(formData);
+
+    if (result?.error) {
+      setError(result.error);
+      setLoading(false);
+    }
   };
 
   return (

@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { CalendarDays, CheckSquare, NotebookPen, UtensilsCrossed, Clock, Check, Flame, TrendingUp } from "lucide-react";
+import { createClient } from "@/src/utils/supabase/client";
+import { useUser } from "@/src/hooks/useUser";
 
 type CalendarTask = { task_id: string; name: string; task_date: string; start_time: string; end_time: string; is_done: boolean };
 type CategoryMap = Record<string, { id: number; label: string; done: boolean }[]>;
@@ -8,7 +10,6 @@ type Note = { note_id: string; title: string; content: string; color?: string };
 type FoodLogEntry = { food_log_id: string; food: string; category: MealType; calories: number; date_time: string };
 type MealType = "Breakfast" | "Lunch" | "Dinner" | "Snack";
 
-const HARDCODED_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 interface DashboardProps {
   onNavigate: (tab: string) => void;
@@ -24,33 +25,36 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [foodEntries, setFoodEntries] = useState<FoodLogEntry[]>([]);
   const [todayTasks, setTodayTasks] = useState<CalendarTask[]>([]);
+  const { user } = useUser();
 
   useEffect(() => {
-    // Fetch Notes
-    fetch(`/api/notes?user_id=${HARDCODED_USER_ID}`)
-      .then((r) => r.json())
-      .then((data: Note[]) => setNotes(Array.isArray(data) ? data : []))
-      .catch(() => setNotes([]));
+    if (user) {
+      // Fetch Notes
+      fetch(`/api/notes?user_id=${user.user_id}`)
+        .then((r) => r.json())
+        .then((data: Note[]) => setNotes(Array.isArray(data) ? data : []))
+        .catch(() => setNotes([]));
 
-    // Fetch Today's Food
-    const d = new Date();
-    const todayStr = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
-    const localDate = new Date(todayStr + "T00:00:00");
-    const start = new Date(localDate.getTime());
-    const end = new Date(localDate.getTime());
-    end.setHours(23, 59, 59, 999);
+      // Fetch Today's Food
+      const d = new Date();
+      const todayStr = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+      const localDate = new Date(todayStr + "T00:00:00");
+      const start = new Date(localDate.getTime());
+      const end = new Date(localDate.getTime());
+      end.setHours(23, 59, 59, 999);
 
-    fetch(`/api/food-logs?user_id=${HARDCODED_USER_ID}&start=${start.toISOString()}&end=${end.toISOString()}`)
-      .then((r) => r.json())
-      .then((data: FoodLogEntry[]) => setFoodEntries(Array.isArray(data) ? data : []))
-      .catch(() => setFoodEntries([]));
+      fetch(`/api/food-logs?user_id=${user.user_id}&start=${start.toISOString()}&end=${end.toISOString()}`)
+        .then((r) => r.json())
+        .then((data: FoodLogEntry[]) => setFoodEntries(Array.isArray(data) ? data : []))
+        .catch(() => setFoodEntries([]));
 
-    // Fetch Today's Tasks
-    fetch(`/api/tasks?user_id=${HARDCODED_USER_ID}&date=${todayStr}`)
-      .then((r) => r.json())
-      .then((data: CalendarTask[]) => setTodayTasks(Array.isArray(data) ? data : []))
-      .catch(() => setTodayTasks([]));
-  }, []);
+      // Fetch Today's Tasks
+      fetch(`/api/tasks?user_id=${user.user_id}&date=${todayStr}`)
+        .then((r) => r.json())
+        .then((data: CalendarTask[]) => setTodayTasks(Array.isArray(data) ? data : []))
+        .catch(() => setTodayTasks([]));
+    }
+  }, [user]);
 
   const todayDate = new Date();
   const todayEvents = [...todayTasks].sort((a, b) => a.start_time.localeCompare(b.start_time));
@@ -76,7 +80,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         <p className="text-sm opacity-80">
           {todayDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
         </p>
-        <h2 className="text-2xl font-bold mt-0.5">Good {todayDate.getHours() < 12 ? "morning" : todayDate.getHours() < 17 ? "afternoon" : "evening"}, Shanel ✨</h2>
+        <h2 className="text-2xl font-bold mt-0.5">Good {todayDate.getHours() < 12 ? "morning" : todayDate.getHours() < 17 ? "afternoon" : "evening"}, {user?.display_name || "Guest"} ✨</h2>
         {upcomingEvent && (
           <p className="text-sm mt-2 opacity-90 flex items-center gap-1.5">
             <Clock size={13} /> Next: <span className="font-medium">{upcomingEvent.name}</span> at {formatTime(upcomingEvent.start_time)}

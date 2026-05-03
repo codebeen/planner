@@ -2,9 +2,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { CalendarDays, Clock, Check, X, Inbox, Loader2 } from "lucide-react";
 import { type CalendarTask } from "./Calendar";
+import { useUser } from "@/src/hooks/useUser";
 
-// Hardcoded user_id (replace with real auth later)
-const HARDCODED_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 function formatTime(t: string) {
   if (!t) return "";
@@ -39,12 +38,14 @@ export default function TasksList({ onNavigate }: Props) {
   const [tasks, setTasks] = useState<CalendarTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useUser();
 
   const fetchTasks = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/tasks?user_id=${HARDCODED_USER_ID}`);
+      const res = await fetch(`/api/tasks?user_id=${user.user_id}`);
       if (!res.ok) throw new Error("Failed to fetch tasks");
       const data = await res.json();
       setTasks(data);
@@ -53,7 +54,7 @@ export default function TasksList({ onNavigate }: Props) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchTasks();
