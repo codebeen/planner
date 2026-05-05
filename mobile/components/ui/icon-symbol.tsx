@@ -18,14 +18,20 @@ const MAPPING = {
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
+  'list.bullet': 'format-list-bulleted',
+  'calendar': 'calendar-today',
+  'note.text': 'description',
+  'fork.knife': 'restaurant',
 } as IconMapping;
+
+import { cssInterop } from 'nativewind';
 
 /**
  * An icon component that uses native SF Symbols on iOS, and Material Icons on Android and web.
  * This ensures a consistent look across platforms, and optimal resource usage.
  * Icon `name`s are based on SF Symbols and require manual mapping to Material Icons.
  */
-export function IconSymbol({
+function IconSymbolComponent({
   name,
   size = 24,
   color,
@@ -39,3 +45,7 @@ export function IconSymbol({
 }) {
   return <MaterialIcons color={color} size={size} name={MAPPING[name]} style={style} />;
 }
+
+export const IconSymbol = cssInterop(IconSymbolComponent, {
+  className: 'style',
+});
