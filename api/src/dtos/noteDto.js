@@ -1,9 +1,9 @@
 class NoteDto {
     constructor(note) {
-        this.id = note.note_id;
+        this.note_id = note.note_id;
         this.title = note.title;
         this.content = note.content;
-        this.userId = note.user_id;
+        this.user_id = note.user_id;
     }
 
     static map(notes) {

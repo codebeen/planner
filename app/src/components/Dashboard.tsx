@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { CalendarDays, CheckSquare, NotebookPen, UtensilsCrossed, Clock, Check, Flame, TrendingUp } from "lucide-react";
 import { createClient } from "@/src/utils/supabase/client";
 import { useUser } from "@/src/hooks/useUser";
+import { apiFetch } from "@/src/lib/api";
 
 type CalendarTask = { task_id: string; name: string; task_date: string; start_time: string; end_time: string; is_done: boolean };
 type CategoryMap = Record<string, { id: number; label: string; done: boolean }[]>;
@@ -30,8 +31,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   useEffect(() => {
     if (user) {
       // Fetch Notes
-      fetch(`/api/notes?user_id=${user.user_id}`)
-        .then((r) => r.json())
+      apiFetch(`/api/notes?user_id=${user.user_id}`)
         .then((data: Note[]) => setNotes(Array.isArray(data) ? data : []))
         .catch(() => setNotes([]));
 
@@ -43,14 +43,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       const end = new Date(localDate.getTime());
       end.setHours(23, 59, 59, 999);
 
-      fetch(`/api/food-logs?user_id=${user.user_id}&start=${start.toISOString()}&end=${end.toISOString()}`)
-        .then((r) => r.json())
+      apiFetch(`/api/food-logs?user_id=${user.user_id}&start=${start.toISOString()}&end=${end.toISOString()}`)
         .then((data: FoodLogEntry[]) => setFoodEntries(Array.isArray(data) ? data : []))
         .catch(() => setFoodEntries([]));
 
       // Fetch Today's Tasks
-      fetch(`/api/tasks?user_id=${user.user_id}&date=${todayStr}`)
-        .then((r) => r.json())
+      apiFetch(`/api/tasks?user_id=${user.user_id}&date=${todayStr}`)
         .then((data: CalendarTask[]) => setTodayTasks(Array.isArray(data) ? data : []))
         .catch(() => setTodayTasks([]));
     }

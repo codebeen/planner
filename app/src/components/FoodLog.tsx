@@ -2,8 +2,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Sunrise, Sun, Moon, Apple, UtensilsCrossed, Flame, X, Plus, Loader2 } from "lucide-react";
 
-// Hardcoded user_id (replace with real auth later)
-const HARDCODED_USER_ID = "00000000-0000-0000-0000-000000000001";
+import { useUser } from "@/src/hooks/useUser";
+import { apiFetch } from "@/src/lib/api";
 
 export type FoodLogEntry = { 
   food_log_id: string; 
@@ -51,9 +51,11 @@ export default function FoodLog() {
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useUser();
 
   // ── Fetch logs ───────────────────────────────────────────────────────────
   const fetchLogs = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
     setError(null);
     try {
@@ -63,16 +65,14 @@ export default function FoodLog() {
       const end = new Date(localDate.getTime());
       end.setHours(23, 59, 59, 999);
 
-      const res = await fetch(`/api/food-logs?user_id=${HARDCODED_USER_ID}&start=${start.toISOString()}&end=${end.toISOString()}`);
-      if (!res.ok) throw new Error("Failed to fetch food logs");
-      const data = await res.json();
+      const data = await apiFetch(`/api/food-logs?user_id=${user.user_id}&start=${start.toISOString()}&end=${end.toISOString()}`);
       setEntries(data);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
       setLoading(false);
     }
-  }, [date]);
+  }, [user, date]);
 
   useEffect(() => {
     fetchLogs();
@@ -80,26 +80,20 @@ export default function FoodLog() {
 
   // ── Add entry ────────────────────────────────────────────────────────────
   const add = async () => {
-    if (!food.trim()) return;
+    if (!user || !food.trim()) return;
     setAdding(true);
     setError(null);
     try {
-      const res = await fetch("/api/food-logs", {
+      const created = await apiFetch("/api/food-logs", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           food: food.trim(),
           category: active,
           calories: parseFloat(calories) || 0,
           date_time: `${date}T${new Date().toISOString().split("T")[1]}`,
-          user_id: HARDCODED_USER_ID,
+          user_id: user.user_id,
         }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? "Failed to add food log");
-      }
-      const created = await res.json();
       setEntries(prev => [...prev, created]);
       setFood(""); 
       setCalories("");
@@ -114,11 +108,7 @@ export default function FoodLog() {
   const remove = async (id: string) => {
     setError(null);
     try {
-      const res = await fetch(`/api/food-logs/${id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? "Failed to delete food log");
-      }
+      await apiFetch(`/api/food-logs/${id}`, { method: "DELETE" });
       setEntries(prev => prev.filter(m => m.food_log_id !== id));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Unknown error");
@@ -201,7 +191,7 @@ export default function FoodLog() {
                   {m.calories ? ` · ${m.calories} kcal` : ""}
                 </p>
               </div>
-              <button onClick={() => remove(m.food_log_id)} className="opacity-0 group-hover:opacity-100 text-pink-300 hover:text-pink-500 transition-opacity">
+              <button onClick={() => remove(m.food_log_id)} className="text-pink-400 hover:text-pink-600 flex-shrink-0 mt-0.5">
                 <X size={14} />
               </button>
             </div>

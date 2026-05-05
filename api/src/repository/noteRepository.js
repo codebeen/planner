@@ -5,7 +5,7 @@ class NoteRepository {
     async getByUserId(userId) {
         const { data, error } = await supabaseAdmin
             .from("Notes")
-            .select("*")
+            .select("note_id, title, content, color, user_id")
             .eq("user_id", userId);
 
         if (error) throw error;
@@ -16,7 +16,7 @@ class NoteRepository {
     async getByNoteId(noteId) {
         const { data, error } = await supabaseAdmin
             .from("Notes")
-            .select("*")
+            .select("note_id, title, content, color, user_id")
             .eq("note_id", noteId);
         
         if (error) throw error;
@@ -28,7 +28,7 @@ class NoteRepository {
         const { data, error } = await supabaseAdmin
             .from("Notes")
             .insert([note])
-            .select();
+            .select("note_id, title, content, color, user_id");
 
         if (error) throw error;
         return data;
@@ -40,7 +40,7 @@ class NoteRepository {
             .from("Notes")
             .update(updatedFields)
             .eq("note_id", noteId)
-            .select();
+            .select("note_id, title, content, color, user_id");
 
         if (error) throw error;
         return data; // return the first match

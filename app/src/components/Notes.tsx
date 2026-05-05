@@ -2,9 +2,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { NotebookPen, Plus, X, Loader2 } from "lucide-react";
 import NoteEditor from "./NoteEditor";
-
-// Hardcoded user_id (replace with real auth later)
-const HARDCODED_USER_ID = "00000000-0000-0000-0000-000000000001";
+import { useUser } from "@/src/hooks/useUser";
+import { apiFetch } from "@/src/lib/api";
 
 export type Note = {
   note_id: string;
@@ -27,6 +26,7 @@ export default function Notes() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useUser();
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -37,12 +37,11 @@ export default function Notes() {
 
   // ── Fetch all notes ──────────────────────────────────────────────────────
   const fetchNotes = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/notes?user_id=${HARDCODED_USER_ID}`);
-      if (!res.ok) throw new Error("Failed to fetch notes");
-      const data: Note[] = await res.json();
+      const data: Note[] = await apiFetch(`/api/notes?user_id=${user.user_id}`);
       // Attach a random color for display purposes
       setNotes(
         data.map((n) => ({
@@ -55,7 +54,7 @@ export default function Notes() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchNotes();
@@ -81,6 +80,7 @@ export default function Notes() {
 
   // ── Save (create or update) ──────────────────────────────────────────────
   const save = async () => {
+    if (!user) return;
     if (!title.trim() && !content.trim()) {
       setIsModalOpen(false);
       return;
@@ -91,36 +91,24 @@ export default function Notes() {
     try {
       if (!editingNote) {
         // CREATE
-        const res = await fetch("/api/notes", {
+        const created: Note = await apiFetch("/api/notes", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title: title.trim(),
             content: content.trim(),
-            user_id: HARDCODED_USER_ID,
+            user_id: user.user_id,
           }),
         });
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error ?? "Failed to create note");
-        }
-        const created: Note = await res.json();
         setNotes((prev) => [{ ...created, color: modalColor }, ...prev]);
       } else {
         // UPDATE
-        const res = await fetch(`/api/notes/${editingNote.note_id}`, {
+        const updated: Note = await apiFetch(`/api/notes/${editingNote.note_id}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title: title.trim(),
             content: content.trim(),
           }),
         });
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error ?? "Failed to update note");
-        }
-        const updated: Note = await res.json();
         setNotes((prev) =>
           prev.map((n) =>
             n.note_id === editingNote.note_id
@@ -141,11 +129,7 @@ export default function Notes() {
   const remove = async (noteId: string) => {
     setError(null);
     try {
-      const res = await fetch(`/api/notes/${noteId}`, { method: "DELETE" });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? "Failed to delete note");
-      }
+      await apiFetch(`/api/notes/${noteId}`, { method: "DELETE" });
       setNotes((prev) => prev.filter((n) => n.note_id !== noteId));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Unknown error");
@@ -238,7 +222,7 @@ export default function Notes() {
                   e.stopPropagation();
                   remove(n.note_id);
                 }}
-                className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 text-pink-300 hover:text-pink-500 transition-opacity"
+                className="absolute top-3 right-3 text-pink-400 hover:text-pink-600"
               >
                 <X size={13} />
               </button>

@@ -2,8 +2,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, CalendarDays, Plus, Check, X, Clock, Loader2 } from "lucide-react";
 
-// Hardcoded user_id (replace with real auth later)
-const HARDCODED_USER_ID = "00000000-0000-0000-0000-000000000001";
+import { useUser } from "@/src/hooks/useUser";
+import { apiFetch } from "@/src/lib/api";
 
 export type CalendarTask = { 
   task_id: string; 
@@ -44,22 +44,22 @@ export default function Calendar() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useUser();
 
   // ── Fetch tasks for the month ────────────────────────────────────────────
   const fetchTasks = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/tasks?user_id=${HARDCODED_USER_ID}&year=${year}&month=${month + 1}`);
-      if (!res.ok) throw new Error("Failed to fetch tasks");
-      const data = await res.json();
+      const data = await apiFetch(`/api/tasks?user_id=${user.user_id}&year=${year}&month=${month + 1}`);
       setTasks(data);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
       setLoading(false);
     }
-  }, [year, month]);
+  }, [user, year, month]);
 
   useEffect(() => {
     fetchTasks();
@@ -79,24 +79,21 @@ export default function Calendar() {
 
   // ── Add task ─────────────────────────────────────────────────────────────
   const addTask = async () => {
-    if (!form.text.trim() || !selected || timeToMin(form.start) >= timeToMin(form.end)) return;
+    if (!user || !form.text.trim() || !selected || timeToMin(form.start) >= timeToMin(form.end)) return;
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/tasks", {
+      const created = await apiFetch("/api/tasks", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.text.trim(),
           task_date: selected,
           start_time: form.start,
           end_time: form.end,
           is_done: false,
-          user_id: HARDCODED_USER_ID,
+          user_id: user.user_id,
         }),
       });
-      if (!res.ok) throw new Error("Failed to add task");
-      const created = await res.json();
       setTasks(prev => [...prev, created].sort((a, b) => timeToMin(a.start_time) - timeToMin(b.start_time)));
       setForm(EMPTY_FORM);
       setShowForm(false);
@@ -111,13 +108,10 @@ export default function Calendar() {
   const toggleTask = async (task: CalendarTask) => {
     setError(null);
     try {
-      const res = await fetch(`/api/tasks/${task.task_id}`, {
+      const updated = await apiFetch(`/api/tasks/${task.task_id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...task, is_done: !task.is_done }),
       });
-      if (!res.ok) throw new Error("Failed to update task");
-      const updated = await res.json();
       setTasks(prev => prev.map(t => t.task_id === task.task_id ? updated : t));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Unknown error");
@@ -128,8 +122,7 @@ export default function Calendar() {
   const removeTask = async (task_id: string) => {
     setError(null);
     try {
-      const res = await fetch(`/api/tasks/${task_id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete task");
+      await apiFetch(`/api/tasks/${task_id}`, { method: "DELETE" });
       setTasks(prev => prev.filter(t => t.task_id !== task_id));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Unknown error");
@@ -234,7 +227,7 @@ export default function Calendar() {
                         )}
                       </div>
                     </div>
-                    <button onClick={() => removeTask(t.task_id)} className="opacity-0 group-hover:opacity-100 text-pink-300 hover:text-pink-500 flex-shrink-0 mt-0.5 transition-opacity"><X size={13} /></button>
+                    <button onClick={() => removeTask(t.task_id)} className="text-pink-400 hover:text-pink-600 flex-shrink-0 mt-0.5"><X size={13} /></button>
                   </div>
                 </li>
               ))}

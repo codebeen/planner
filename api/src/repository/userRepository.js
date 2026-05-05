@@ -5,7 +5,7 @@ class UserRepository {
     async getUserById(userId) {
         const { data, error } = await supabaseAdmin
             .from("Users")
-            .select("*")
+            .select("user_id, email, display_name")
             .eq("user_id", userId);
 
         if (error) throw error;
@@ -17,7 +17,7 @@ class UserRepository {
         const { data, error } = await supabaseAdmin
             .from("Users")
             .insert([user])
-            .select();
+            .select("user_id, email, display_name");
 
         if (error) throw error;
         return data;
@@ -29,7 +29,7 @@ class UserRepository {
             .from("Users")
             .update(updatedFields)
             .eq("user_id", userId)
-            .select();
+            .select("user_id, email, display_name");
 
         if (error) throw error;
         return data;

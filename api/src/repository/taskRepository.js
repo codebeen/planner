@@ -5,7 +5,7 @@ class TaskRepository {
     async getByUserId(userId) {
         const { data, error } = await supabaseAdmin
             .from("Tasks")
-            .select("*")
+            .select("task_id, name, task_date, start_time, end_time, is_done, user_id")
             .eq("user_id", userId);
         
         if (error) throw error;
@@ -16,7 +16,7 @@ class TaskRepository {
     async getByTaskId(taskId) {
         const { data, error } = await supabaseAdmin
             .from("Tasks")
-            .select("*")
+            .select("task_id, name, task_date, start_time, end_time, is_done, user_id")
             .eq("task_id", taskId);
         
         if (error) throw error;
@@ -28,7 +28,7 @@ class TaskRepository {
         const { data, error } = await supabaseAdmin
             .from("Tasks")
             .insert([task])
-            .select();
+            .select("task_id, name, task_date, start_time, end_time, is_done, user_id");
         
         if (error) throw error;
         return data;
@@ -40,7 +40,7 @@ class TaskRepository {
             .from("Tasks")
             .update(updatedFields)
             .eq("task_id", taskId)
-            .select();
+            .select("task_id, name, task_date, start_time, end_time, is_done, user_id");
         
         if (error) throw error;
         return data; 
