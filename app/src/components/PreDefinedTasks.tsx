@@ -65,7 +65,7 @@ export default function PreDefinedTasks({ categoryTasks, setCategoryTasks }: Pro
                     {t.done && <Check size={10} className="text-white" strokeWidth={3} />}
                   </button>
                   <span className={`flex-1 text-sm ${t.done ? "line-through text-pink-300" : "text-pink-800"}`}>{t.label}</span>
-                  <button onClick={() => remove(p.category, t.id)} className="opacity-0 group-hover:opacity-100 text-pink-300 hover:text-pink-500"><X size={13} /></button>
+                  <button onClick={() => remove(p.category, t.id)} className="text-pink-400 hover:text-pink-600"><X size={13} /></button>
                 </li>
               ))}
             </ul>
@@ -90,7 +90,7 @@ export default function PreDefinedTasks({ categoryTasks, setCategoryTasks }: Pro
                 {t.done && <Check size={10} className="text-white" strokeWidth={3} />}
               </button>
               <span className={`flex-1 text-sm ${t.done ? "line-through text-pink-300" : "text-pink-800"}`}>{t.label}</span>
-              <button onClick={() => remove("Custom", t.id)} className="opacity-0 group-hover:opacity-100 text-pink-300 hover:text-pink-500"><X size={13} /></button>
+              <button onClick={() => remove("Custom", t.id)} className="text-pink-400 hover:text-pink-600"><X size={13} /></button>
             </li>
           ))}
         </ul>

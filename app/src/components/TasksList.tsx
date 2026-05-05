@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { CalendarDays, Clock, Check, X, Inbox, Loader2 } from "lucide-react";
 import { type CalendarTask } from "./Calendar";
 import { useUser } from "@/src/hooks/useUser";
+import { apiFetch } from "@/src/lib/api";
 
 
 function formatTime(t: string) {
@@ -45,9 +46,7 @@ export default function TasksList({ onNavigate }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/tasks?user_id=${user.user_id}`);
-      if (!res.ok) throw new Error("Failed to fetch tasks");
-      const data = await res.json();
+      const data = await apiFetch(`/api/tasks?user_id=${user.user_id}`);
       setTasks(data);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Unknown error");
@@ -62,13 +61,10 @@ export default function TasksList({ onNavigate }: Props) {
 
   const toggle = async (task: CalendarTask) => {
     try {
-      const res = await fetch(`/api/tasks/${task.task_id}`, {
+      const updated = await apiFetch(`/api/tasks/${task.task_id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...task, is_done: !task.is_done }),
       });
-      if (!res.ok) throw new Error("Failed to update task");
-      const updated = await res.json();
       setTasks(prev => prev.map(t => t.task_id === task.task_id ? updated : t));
     } catch (e) {
       console.error(e);
@@ -77,8 +73,7 @@ export default function TasksList({ onNavigate }: Props) {
 
   const remove = async (task_id: string) => {
     try {
-      const res = await fetch(`/api/tasks/${task_id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete task");
+      await apiFetch(`/api/tasks/${task_id}`, { method: "DELETE" });
       setTasks(prev => prev.filter(t => t.task_id !== task_id));
     } catch (e) {
       console.error(e);
@@ -186,7 +181,7 @@ export default function TasksList({ onNavigate }: Props) {
                   </div>
                   <button
                     onClick={() => remove(t.task_id)}
-                    className="opacity-0 group-hover:opacity-100 text-pink-300 hover:text-pink-500 flex-shrink-0 transition-opacity"
+                    className="text-pink-400 hover:text-pink-600 flex-shrink-0 mt-0.5"
                   >
                     <X size={13} />
                   </button>

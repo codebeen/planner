@@ -5,7 +5,7 @@ class FoodLogRepository {
     async getByUserId(userId) {
         const { data, error } = await supabaseAdmin
             .from("FoodLogs")
-            .select("*")
+            .select("food_log_id, food, category, calories, date_time, user_id")
             .eq("user_id", userId);
         
         if (error) throw error;
@@ -16,7 +16,7 @@ class FoodLogRepository {
     async getByFoodLogId(foodLogId) {
         const { data, error } = await supabaseAdmin
             .from("FoodLogs")
-            .select("*")
+            .select("food_log_id, food, category, calories, date_time, user_id")
             .eq("food_log_id", foodLogId);
         
         if (error) throw error;
@@ -28,7 +28,7 @@ class FoodLogRepository {
         const { data, error } = await supabaseAdmin
             .from("FoodLogs")
             .insert([foodLog])
-            .select();
+            .select("food_log_id, food, category, calories, date_time, user_id");
         
         if (error) throw error;
         return data;
@@ -40,7 +40,7 @@ class FoodLogRepository {
             .from("FoodLogs")
             .update(updatedFields)
             .eq("food_log_id", foodLogId)
-            .select();
+            .select("food_log_id, food, category, calories, date_time, user_id");
         
         if (error) throw error;
         return data; // return the first match
